@@ -8,7 +8,7 @@ small grey bilingual labels, bold black values, thin rules between rows.
 import math
 import os
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageEnhance, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "entry.png")
@@ -72,42 +72,33 @@ def draw_emblem(draw, cx, cy, r):
 
 # ---- portrait --------------------------------------------------------------
 def draw_portrait(base, x, y, w, h):
-    """Engraved-style printed portrait inside the box at (x, y, w, h)."""
-    p = Image.new("RGB", (w, h), (206, 213, 221))
-    d = ImageDraw.Draw(p, "RGBA")
-    cx = w // 2
-    # shoulders / dark jacket
-    d.polygon([(cx - 62, h), (cx - 54, h - 52), (cx - 20, h - 66),
-               (cx + 20, h - 66), (cx + 54, h - 52), (cx + 62, h)],
-              fill=(52, 54, 66))
-    # shirt V
-    d.polygon([(cx - 13, h - 64), (cx + 13, h - 64), (cx, h - 34)],
-              fill=(226, 228, 230))
-    # neck
-    d.rectangle([cx - 11, h - 84, cx + 11, h - 58], fill=(219, 178, 146))
-    # hair, pulled back: a dark shape behind the face, plus a small bun
-    d.ellipse([cx - 45, 14, cx + 45, 124], fill=(56, 42, 36))
-    d.ellipse([cx - 12, 2, cx + 12, 24], fill=(56, 42, 36))
-    # face
-    d.ellipse([cx - 39, 30, cx + 39, 138], fill=(233, 197, 168))
-    # soft shading on the cheeks
-    d.ellipse([cx - 34, 92, cx - 8, 122], fill=(224, 178, 146, 90))
-    d.ellipse([cx + 8, 92, cx + 34, 122], fill=(224, 178, 146, 90))
-    # brows and eyes
-    for sgn in (-1, 1):
-        ex = cx + sgn * 19
-        d.line([ex - 10, 74, ex + 10, 73], fill=(70, 52, 44), width=3)
-        d.ellipse([ex - 7, 82, ex + 7, 88], fill=(46, 38, 34))
-    # nose
-    d.line([cx + 1, 88, cx - 2, 106], fill=(196, 152, 118), width=2)
-    d.line([cx - 6, 109, cx + 6, 109], fill=(196, 152, 118), width=2)
-    # mouth
-    d.arc([cx - 12, 112, cx + 12, 126], start=15, end=165,
-          fill=(168, 96, 92), width=3)
-    # fine horizontal print lines over the whole portrait
-    for ly in range(0, h, 3):
-        d.line([0, ly, w, ly], fill=(30, 30, 40, 26), width=1)
-    base.paste(p, (x, y))
+    """The holder's ID photo (portrait.png) set into the box at (x, y, w, h).
+
+    The photo is centre-cropped to the box's aspect ratio, taking the crop
+    mostly from the bottom (shoulders) so the face sits as in an ID photo,
+    then printed with slightly reduced saturation. One faint guilloche
+    curve overlaps the photo's bottom corner, the way real data pages
+    print over the photo edge, and the usual frame border closes the box.
+    """
+    src = Image.open(os.path.join(HERE, "portrait.png")).convert("RGB")
+    sw, sh = src.size
+    crop_h = int(sh * 0.92)                    # keep the head, trim shoulders
+    crop_w = int(crop_h * w / h)
+    cx0 = (sw - crop_w) // 2
+    cy0 = int(sh * 0.04)                       # small margin above the hair
+    photo = src.crop((cx0, cy0, cx0 + crop_w, cy0 + crop_h))
+    photo = photo.resize((w, h), Image.LANCZOS)
+    photo = ImageEnhance.Color(photo).enhance(0.85)
+    base.paste(photo, (x, y))
+    # one faint guilloche curve printed over the photo's bottom-left corner
+    over = Image.new("RGBA", base.size, (0, 0, 0, 0))
+    od = ImageDraw.Draw(over)
+    pts = []
+    for px in range(x - 8, x + 76, 4):
+        py = y + h - 22 + (px - x) * 0.32 + 3.5 * math.sin((px - x) / 13.0)
+        pts.append((px, py))
+    od.line(pts, fill=(168, 186, 218, 110), width=1)
+    base.alpha_composite(over)
     ImageDraw.Draw(base).rectangle([x, y, x + w, y + h],
                                    outline=(90, 90, 90), width=2)
 
